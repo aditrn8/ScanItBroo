@@ -1,0 +1,42 @@
+import { NextResponse } from "next/server";
+import { getScanCache, triggerFullScan } from "@/lib/scanner";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const force = searchParams.get("force") === "true";
+
+  const cache = getScanCache();
+
+  // ONLY trigger scan if force=true is explicitly requested
+  if (force && !cache.isScanning) {
+    triggerFullScan().catch((err) => console.error("Background scan error:", err));
+  }
+
+  return NextResponse.json({
+    status: cache.isScanning ? "scanning" : cache.data.length > 0 ? "success" : "idle",
+    data: cache.data,
+    summary: {
+      totalPairs: cache.totalPairs,
+      scannedCount: cache.scannedCount,
+      confluenceCount: cache.confluenceCount,
+      lastUpdated: cache.lastUpdated,
+      isScanning: cache.isScanning,
+      scanDurationMs: cache.scanDurationMs,
+      error: cache.error,
+    },
+  });
+}
+
+export async function POST() {
+  const cache = getScanCache();
+  if (!cache.isScanning) {
+    triggerFullScan().catch((err) => console.error("Forced scan error:", err));
+  }
+
+  return NextResponse.json({
+    status: "started",
+    isScanning: true,
+  });
+}
