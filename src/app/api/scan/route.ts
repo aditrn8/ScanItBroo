@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getScanCache, triggerFullScan } from "@/lib/scanner";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Max execution time for Vercel Serverless Functions
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

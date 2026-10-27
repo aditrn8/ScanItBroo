@@ -139,8 +139,8 @@ export async function triggerFullScan(): Promise<void> {
 
     cache.totalPairs = usdtTickers.length;
 
-    // Concurrency: 2 pairs at a time (2 * 3 klines = 6 calls per chunk)
-    const CONCURRENCY = 2;
+    // Concurrency: 3 pairs at a time (optimized for Vercel 60s max execution time)
+    const CONCURRENCY = 3;
     for (let i = 0; i < usdtTickers.length; i += CONCURRENCY) {
       const chunk = usdtTickers.slice(i, i + CONCURRENCY);
       const promises = chunk.map((ticker) => scanSingleCoin(ticker));
@@ -159,8 +159,8 @@ export async function triggerFullScan(): Promise<void> {
       cache.scannedCount = Math.min(usdtTickers.length, i + CONCURRENCY);
       cache.lastUpdated = Date.now();
 
-      // Pacing delay between chunks: 650ms to stay safely under 10 req/s limit
-      await sleep(650);
+      // Pacing delay between chunks to stay within rate limits (~25-30s total scan)
+      await sleep(400);
     }
 
     cache.scanDurationMs = Date.now() - startTime;
