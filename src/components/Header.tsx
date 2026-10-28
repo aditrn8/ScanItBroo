@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { RefreshCw, Zap, ShieldCheck } from "lucide-react";
+import { RefreshCw, Zap, ShieldCheck, Square } from "lucide-react";
 
 interface HeaderProps {
   isScanning: boolean;
@@ -9,6 +9,7 @@ interface HeaderProps {
   totalPairs: number;
   scannedCount: number;
   onRefresh: () => void;
+  onStopScan?: () => void;
 }
 
 export function Header({
@@ -17,6 +18,7 @@ export function Header({
   totalPairs,
   scannedCount,
   onRefresh,
+  onStopScan,
 }: HeaderProps) {
   const formatTime = (ts: number) => {
     if (!ts) return "Belum scan";
@@ -55,19 +57,31 @@ export function Header({
             </div>
           </div>
 
-          {/* Quick Refresh Icon on mobile */}
-          <button
-            onClick={onRefresh}
-            disabled={isScanning}
-            className={`sm:hidden p-2 rounded-xl border transition-all ${
-              isScanning
-                ? "bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed"
-                : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25 active:scale-95"
-            }`}
-            title="Scan Ulang"
-          >
-            <RefreshCw className={`w-4 h-4 ${isScanning ? "animate-spin" : ""}`} />
-          </button>
+          {/* Quick Actions on Mobile */}
+          <div className="flex items-center gap-1.5 sm:hidden">
+            {isScanning && onStopScan && (
+              <button
+                onClick={onStopScan}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 text-xs font-bold active:scale-95"
+              >
+                <Square className="w-3.5 h-3.5 fill-red-400 text-red-400" />
+                <span>Stop</span>
+              </button>
+            )}
+
+            <button
+              onClick={onRefresh}
+              disabled={isScanning}
+              className={`p-2 rounded-xl border transition-all ${
+                isScanning
+                  ? "bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed"
+                  : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25 active:scale-95"
+              }`}
+              title="Scan Ulang"
+            >
+              <RefreshCw className={`w-4 h-4 ${isScanning ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         {/* Scan Status & Actions */}
@@ -99,6 +113,17 @@ export function Header({
             <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
             <span>DoH Bypass</span>
           </div>
+
+          {/* Stop Scan Button on Desktop */}
+          {isScanning && onStopScan && (
+            <button
+              onClick={onStopScan}
+              className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 cursor-pointer active:scale-95"
+            >
+              <Square className="w-3.5 h-3.5 fill-red-400 text-red-400" />
+              <span>Stop Scan</span>
+            </button>
+          )}
 
           {/* Refresh Button on desktop */}
           <button

@@ -17,6 +17,7 @@ import {
   Play,
   Loader2,
   CheckCircle2,
+  Square,
 } from "lucide-react";
 import { CustomDropdown, DropdownOption } from "./CustomDropdown";
 
@@ -41,6 +42,7 @@ interface FilterControlsProps {
   filteredCount: number;
   isScanning: boolean;
   onStartScan: () => void;
+  onStopScan?: () => void;
   hasScanned: boolean;
 }
 
@@ -56,6 +58,7 @@ export function FilterControls({
   filteredCount,
   isScanning,
   onStartScan,
+  onStopScan,
   hasScanned,
 }: FilterControlsProps) {
   const volumeOptions: DropdownOption<VolumeFilterType>[] = [
@@ -201,12 +204,23 @@ export function FilterControls({
             </div>
           </div>
 
-          {/* Action Button: Mulai Scan */}
-          <div className="w-full sm:w-auto">
+          {/* Action Buttons: Mulai Scan & Stop Scan */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {isScanning && onStopScan && (
+              <button
+                type="button"
+                onClick={onStopScan}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 select-none cursor-pointer active:scale-[0.98]"
+              >
+                <Square className="w-3.5 h-3.5 fill-red-400 text-red-400" />
+                <span>Stop</span>
+              </button>
+            )}
+
             <button
               onClick={onStartScan}
               disabled={isScanning}
-              className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all select-none cursor-pointer active:scale-[0.98] ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all select-none cursor-pointer active:scale-[0.98] ${
                 isScanning
                   ? "bg-gray-800 text-gray-400 border border-gray-700 cursor-not-allowed"
                   : "bg-gradient-to-r from-emerald-500 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-black shadow-glow-green"

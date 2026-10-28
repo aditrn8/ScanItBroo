@@ -1,14 +1,15 @@
 "use client";
 
 import React from "react";
-import { ExternalLink, Flame, ShieldAlert } from "lucide-react";
+import { ExternalLink, Flame, ShieldAlert, BarChart2 } from "lucide-react";
 import { ScannedCoin, TimeframeEMA } from "@/types/crypto";
 
 interface CoinCardProps {
   coin: ScannedCoin;
+  onSelect?: (coin: ScannedCoin) => void;
 }
 
-export function CoinCard({ coin }: CoinCardProps) {
+export function CoinCard({ coin, onSelect }: CoinCardProps) {
   const formatUSD = (val: number) => {
     if (val >= 1000) {
       return val.toLocaleString("en-US", {
@@ -94,7 +95,10 @@ export function CoinCard({ coin }: CoinCardProps) {
   };
 
   return (
-    <div className="glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group">
+    <div
+      onClick={() => onSelect && onSelect(coin)}
+      className="glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group cursor-pointer transition-all duration-200 hover:scale-[1.01]"
+    >
       {/* Background Accent glow */}
       {coin.isConfluence && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/20 transition-all" />
@@ -157,25 +161,24 @@ export function CoinCard({ coin }: CoinCardProps) {
 
       {/* Footer Actions */}
       <div className="mt-3 sm:mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
-        <span className="text-[10px] sm:text-[11px] text-gray-500 flex items-center gap-1 truncate">
-          {coin.isConfluence ? (
-            <span className="text-emerald-400 font-semibold flex items-center gap-1 truncate">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              Full Confluence
-            </span>
-          ) : (
-            <span className="text-gray-400 flex items-center gap-1 truncate">
-              <ShieldAlert className="w-3 h-3 text-gray-500 shrink-0" />
-              Parsial di atas EMA
-            </span>
-          )}
-        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect && onSelect(coin);
+          }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-medium text-emerald-300 hover:text-white transition-all cursor-pointer active:scale-95"
+        >
+          <BarChart2 className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Chart & Detail</span>
+        </button>
 
         {/* Direct Link to Bitunix Futures */}
         <a
           href={`https://www.bitunix.com/futures-trade/${coin.symbol}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/5 hover:bg-emerald-500 hover:text-black border border-white/10 text-xs font-medium text-gray-300 hover:border-emerald-400 transition-all cursor-pointer shadow-sm shrink-0 active:scale-95"
         >
           <span>Bitunix</span>

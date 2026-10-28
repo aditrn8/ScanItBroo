@@ -10,6 +10,7 @@ import {
 } from "@/components/FilterControls";
 import { CoinCard } from "@/components/CoinCard";
 import { Pagination } from "@/components/Pagination";
+import { CoinDetailModal } from "@/components/CoinDetailModal";
 import { ScannedCoin, ScanApiResponse } from "@/types/crypto";
 import {
   Zap,
@@ -20,6 +21,7 @@ import {
   Globe,
   Rocket,
   Radio,
+  Square,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -42,6 +44,9 @@ export default function HomePage() {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
+
+  // Selected coin for Detail Modal
+  const [selectedCoin, setSelectedCoin] = useState<ScannedCoin | null>(null);
 
   // Fetch only cache without forcing background scan
   const fetchScanData = useCallback(async () => {
@@ -88,6 +93,17 @@ export default function HomePage() {
       setTimeout(() => fetchScanData(), 600);
     } catch (err) {
       console.error("Failed to trigger scan:", err);
+    }
+  };
+
+  // Stop scan on demand
+  const handleStopScan = async () => {
+    try {
+      await fetch("/api/scan?action=stop", { method: "POST" });
+      setSummary((prev) => ({ ...prev, isScanning: false }));
+      setTimeout(() => fetchScanData(), 400);
+    } catch (err) {
+      console.error("Failed to stop scan:", err);
     }
   };
 
@@ -195,6 +211,7 @@ export default function HomePage() {
         totalPairs={summary.totalPairs}
         scannedCount={summary.scannedCount}
         onRefresh={handleStartScan}
+        onStopScan={handleStopScan}
       />
 
       {/* Main Content Area */}
@@ -217,6 +234,7 @@ export default function HomePage() {
           filteredCount={filteredCoins.length}
           isScanning={summary.isScanning}
           onStartScan={handleStartScan}
+          onStopScan={handleStopScan}
           hasScanned={hasEverScanned}
         />
 
@@ -244,8 +262,18 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="text-[11px] text-emerald-400 font-semibold px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 whitespace-nowrap">
-              Ditemukan: {filteredCoins.length} Koin Lolos
+            <div className="flex items-center gap-2">
+              <div className="text-[11px] text-emerald-400 font-semibold px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 whitespace-nowrap">
+                Ditemukan: {filteredCoins.length} Koin
+              </div>
+              <button
+                type="button"
+                onClick={handleStopScan}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold transition-all cursor-pointer active:scale-95"
+              >
+                <Square className="w-3.5 h-3.5 fill-red-400 text-red-400" />
+                <span>Stop Scan</span>
+              </button>
             </div>
           </div>
         )}
@@ -373,7 +401,11 @@ export default function HomePage() {
             {/* Grid of Coins */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {paginatedCoins.map((coin) => (
-                <CoinCard key={coin.symbol} coin={coin} />
+                <CoinCard
+                  key={coin.symbol}
+                  coin={coin}
+                  onSelect={(c) => setSelectedCoin(c)}
+                />
               ))}
             </div>
 
@@ -436,6 +468,12 @@ export default function HomePage() {
           EMA 21 Confluence Engine
         </p>
       </footer>
+
+      {/* Coin Detail Modal with TradingView Chart & Funding Rate */}
+      <CoinDetailModal
+        coin={selectedCoin}
+        onClose={() => setSelectedCoin(null)}
+      />
     </div>
   );
 }

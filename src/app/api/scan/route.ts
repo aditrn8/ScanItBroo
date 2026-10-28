@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getScanCache, triggerFullScan } from "@/lib/scanner";
+import { getScanCache, triggerFullScan, stopScan } from "@/lib/scanner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Max execution time for Vercel Serverless Functions
@@ -30,7 +30,18 @@ export async function GET(request: Request) {
   });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get("action");
+
+  if (action === "stop") {
+    stopScan();
+    return NextResponse.json({
+      status: "stopped",
+      isScanning: false,
+    });
+  }
+
   const cache = getScanCache();
   if (!cache.isScanning) {
     triggerFullScan().catch((err) => console.error("Forced scan error:", err));

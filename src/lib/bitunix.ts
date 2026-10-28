@@ -1,5 +1,5 @@
 import https from "node:https";
-import { BitunixTickerRaw, KlineRaw } from "@/types/crypto";
+import { BitunixTickerRaw, KlineRaw, BitunixFundingRateRaw } from "@/types/crypto";
 
 const BITUNIX_HOST = "fapi.bitunix.com";
 // Known clean Cloudflare IPs for Bitunix in case of DNS poisoning (Internet Positif)
@@ -82,6 +82,7 @@ export async function getFuturesTickers(): Promise<BitunixTickerRaw[]> {
   return [];
 }
 
+
 /**
  * Fetch historical Kline data for symbol and interval (1h, 4h, 1d)
  */
@@ -101,3 +102,18 @@ export async function getFuturesKline(
   }
   return [];
 }
+
+/**
+ * Fetch live Funding Rate for a specific futures symbol
+ */
+export async function getFundingRate(
+  symbol: string
+): Promise<BitunixFundingRateRaw | null> {
+  const path = `/api/v1/futures/market/funding_rate?symbol=${encodeURIComponent(symbol)}`;
+  const res = await bitunixRequest<{ code: number; data: BitunixFundingRateRaw }>(path);
+  if (res && res.code === 0 && res.data) {
+    return res.data;
+  }
+  return null;
+}
+

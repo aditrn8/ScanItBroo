@@ -6,6 +6,7 @@ import { ScannedCoin, BitunixTickerRaw } from "@/types/crypto";
 interface ScannerCache {
   data: ScannedCoin[];
   isScanning: boolean;
+  shouldStop: boolean;
   lastUpdated: number;
   totalPairs: number;
   scannedCount: number;
@@ -23,6 +24,7 @@ if (!global.__scannerCache) {
   global.__scannerCache = {
     data: [],
     isScanning: false,
+    shouldStop: false,
     lastUpdated: 0,
     totalPairs: 0,
     scannedCount: 0,
@@ -33,6 +35,13 @@ if (!global.__scannerCache) {
 
 export function getScanCache(): ScannerCache {
   return global.__scannerCache!;
+}
+
+export function stopScan(): void {
+  const cache = getScanCache();
+  if (cache.isScanning) {
+    cache.shouldStop = true;
+  }
 }
 
 // Utility for pacing calls to respect Bitunix 10 req/s limit
@@ -142,6 +151,11 @@ export async function triggerFullScan(): Promise<void> {
     // Concurrency: 3 pairs at a time (optimized for Vercel 60s max execution time)
     const CONCURRENCY = 3;
     for (let i = 0; i < usdtTickers.length; i += CONCURRENCY) {
+      if (cache.shouldStop) {
+        cache.shouldStop = false;
+        break;
+      }
+
       const chunk = usdtTickers.slice(i, i + CONCURRENCY);
       const promises = chunk.map((ticker) => scanSingleCoin(ticker));
       const chunkResults = await Promise.all(promises);

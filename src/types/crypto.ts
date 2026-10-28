@@ -40,6 +40,29 @@ export interface ScannedCoin {
   scannedAt: number;
 }
 
+export interface BitunixFundingRateRaw {
+  symbol: string;
+  markPrice: string;
+  lastPrice: string;
+  indexPrice: string;
+  fundingRate: string;
+  fundingInterval: number;
+  nextFundingTime: string;
+  maxFundingRate?: string;
+  minFundingRate?: string;
+}
+
+export interface FundingRateData {
+  symbol: string;
+  fundingRatePercent: number; // e.g. 0.0471%
+  fundingRateRaw: string;
+  nextFundingTime: number;
+  markPrice: number;
+  indexPrice: number;
+  lastPrice: number;
+  intervalHours: number;
+}
+
 export interface ScanApiResponse {
   status: "success" | "scanning" | "error";
   message?: string;
