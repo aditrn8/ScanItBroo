@@ -1,5 +1,5 @@
 import { getFuturesTickers, getFuturesKline } from "./bitunix";
-import { calculateEMA, evaluateEMACondition } from "./indicators";
+import { calculateEMA, evaluateEMACondition, calculateTradeSetup } from "./indicators";
 import { ScannedCoin, BitunixTickerRaw } from "@/types/crypto";
 
 // In-Memory Global Cache for Next.js server instance
@@ -11,6 +11,8 @@ interface ScannerCache {
   totalPairs: number;
   scannedCount: number;
   confluenceCount: number;
+  longCount: number;
+  shortCount: number;
   scanDurationMs: number;
   error?: string;
 }
@@ -29,6 +31,8 @@ if (!global.__scannerCache) {
     totalPairs: 0,
     scannedCount: 0,
     confluenceCount: 0,
+    longCount: 0,
+    shortCount: 0,
     scanDurationMs: 0,
   };
 }
@@ -61,17 +65,18 @@ async function scanSingleCoin(ticker: BitunixTickerRaw): Promise<ScannedCoin | n
   }
 
   try {
-    // Fetch 1h, 4h, 1d in parallel for this coin
+    // Fetch 1h, 4h, 1d in parallel for this coin (80 candles to support both EMA 21 and EMA 50)
     const [kline1h, kline4h, kline1d] = await Promise.all([
-      getFuturesKline(symbol, "1h", 45),
-      getFuturesKline(symbol, "4h", 45),
-      getFuturesKline(symbol, "1d", 45),
+      getFuturesKline(symbol, "1h", 80),
+      getFuturesKline(symbol, "4h", 80),
+      getFuturesKline(symbol, "1d", 80),
     ]);
 
     const closes1h = kline1h.map((c) => parseFloat(c.close)).filter((n) => !isNaN(n));
     const closes4h = kline4h.map((c) => parseFloat(c.close)).filter((n) => !isNaN(n));
     const closes1d = kline1d.map((c) => parseFloat(c.close)).filter((n) => !isNaN(n));
 
+    // Calculate EMA 21
     const ema1h = calculateEMA(closes1h, 21);
     const ema4h = calculateEMA(closes4h, 21);
     const ema1d = calculateEMA(closes1d, 21);
@@ -81,11 +86,24 @@ async function scanSingleCoin(ticker: BitunixTickerRaw): Promise<ScannedCoin | n
       return null;
     }
 
+    // Calculate EMA 50 (if sufficient candles exist)
+    const ema1h_50 = calculateEMA(closes1h, 50);
+    const ema4h_50 = calculateEMA(closes4h, 50);
+    const ema1d_50 = calculateEMA(closes1d, 50);
+
     const cond1h = evaluateEMACondition(currentPrice, ema1h);
     const cond4h = evaluateEMACondition(currentPrice, ema4h);
     const cond1d = evaluateEMACondition(currentPrice, ema1d);
 
     const isConfluence = cond1h.isAbove && cond4h.isAbove && cond1d.isAbove;
+
+    // Calculate Trade Setups (Price 0-3% above/below EMA50 with automated TP/SL)
+    const setup1h = ema1h_50 ? calculateTradeSetup(currentPrice, ema1h_50, "1h") : null;
+    const setup4h = ema4h_50 ? calculateTradeSetup(currentPrice, ema4h_50, "4h") : null;
+    const setup1d = ema1d_50 ? calculateTradeSetup(currentPrice, ema1d_50, "1d") : null;
+
+    // Primary setup prioritizes 1H setup, then 4H, then 1D
+    const primarySetup = setup1h || setup4h || setup1d || null;
 
     const baseAsset = symbol.replace(/USDT$/, "");
 
@@ -101,20 +119,30 @@ async function scanSingleCoin(ticker: BitunixTickerRaw): Promise<ScannedCoin | n
         diffPercent: cond1h.diffPercent,
         isAbove: cond1h.isAbove,
         candlesCount: closes1h.length,
+        ema50: ema1h_50 ? Number(ema1h_50.toFixed(4)) : undefined,
+        diffPercentEMA50: setup1h?.diffPercentEMA50,
+        setup: setup1h,
       },
       tf4h: {
         ema21: Number(ema4h.toFixed(4)),
         diffPercent: cond4h.diffPercent,
         isAbove: cond4h.isAbove,
         candlesCount: closes4h.length,
+        ema50: ema4h_50 ? Number(ema4h_50.toFixed(4)) : undefined,
+        diffPercentEMA50: setup4h?.diffPercentEMA50,
+        setup: setup4h,
       },
       tf1d: {
         ema21: Number(ema1d.toFixed(4)),
         diffPercent: cond1d.diffPercent,
         isAbove: cond1d.isAbove,
         candlesCount: closes1d.length,
+        ema50: ema1d_50 ? Number(ema1d_50.toFixed(4)) : undefined,
+        diffPercentEMA50: setup1d?.diffPercentEMA50,
+        setup: setup1d,
       },
       isConfluence,
+      tradeSetup: primarySetup,
       scannedAt: Date.now(),
     };
   } catch (err) {
@@ -137,6 +165,8 @@ export async function triggerFullScan(): Promise<void> {
   // Reset cache data so newly found coins stream in progressively
   cache.data = [];
   cache.confluenceCount = 0;
+  cache.longCount = 0;
+  cache.shortCount = 0;
   cache.scannedCount = 0;
 
   const startTime = Date.now();
@@ -166,6 +196,11 @@ export async function triggerFullScan(): Promise<void> {
           cache.data.push(res);
           if (res.isConfluence) {
             cache.confluenceCount++;
+          }
+          if (res.tradeSetup?.signal === "LONG") {
+            cache.longCount++;
+          } else if (res.tradeSetup?.signal === "SHORT") {
+            cache.shortCount++;
           }
         }
       }

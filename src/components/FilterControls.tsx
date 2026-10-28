@@ -11,6 +11,7 @@ import {
   Rocket,
   Zap,
   TrendingUp,
+  TrendingDown,
   ArrowUpRight,
   Droplet,
   BarChart3,
@@ -18,23 +19,34 @@ import {
   Loader2,
   CheckCircle2,
   Square,
+  Target,
+  Clock,
+  Layers,
 } from "lucide-react";
 import { CustomDropdown, DropdownOption } from "./CustomDropdown";
 
 export type VolumeFilterType = "all" | "illiquid" | "medium" | "liquid";
+export type SignalFilterType = "all" | "long" | "short";
+export type TimeframeFilterType = "1h" | "4h" | "1d";
 export type SortOptionType =
   | "default"
   | "dist1h_desc"
   | "dist1d_desc"
   | "gain_desc"
   | "vol_asc"
-  | "vol_desc";
+  | "vol_desc"
+  | "rr_desc"
+  | "ema50_asc";
 
 interface FilterControlsProps {
   search: string;
   onSearchChange: (val: string) => void;
   confluenceOnly: boolean;
   onConfluenceOnlyChange: (val: boolean) => void;
+  signalFilter: SignalFilterType;
+  onSignalFilterChange: (val: SignalFilterType) => void;
+  timeframeFilter: TimeframeFilterType;
+  onTimeframeFilterChange: (val: TimeframeFilterType) => void;
   volumeFilter: VolumeFilterType;
   onVolumeFilterChange: (val: VolumeFilterType) => void;
   sortBy: SortOptionType;
@@ -51,6 +63,10 @@ export function FilterControls({
   onSearchChange,
   confluenceOnly,
   onConfluenceOnlyChange,
+  signalFilter,
+  onSignalFilterChange,
+  timeframeFilter,
+  onTimeframeFilterChange,
   volumeFilter,
   onVolumeFilterChange,
   sortBy,
@@ -61,20 +77,68 @@ export function FilterControls({
   onStopScan,
   hasScanned,
 }: FilterControlsProps) {
-  const volumeOptions: DropdownOption<VolumeFilterType>[] = [
+  const signalOptions: DropdownOption<SignalFilterType>[] = [
     {
-      value: "illiquid",
-      label: "Tidak Likuid",
-      desc: "Turnover 24h < $500K (Low Cap / Illiquid Gems)",
-      badge: "< $500K",
-      icon: <Flame className="w-3.5 h-3.5 text-amber-400" />,
+      value: "all",
+      label: "Semua Setup",
+      desc: "Tampilkan seluruh pair tanpa batasan filter EMA 50",
+      badge: "Semua",
+      icon: <Layers className="w-3.5 h-3.5 text-gray-300" />,
     },
+    {
+      value: "long",
+      label: "🟢 Long Setup",
+      desc: "Harga 0% s/d +3% di atas EMA 50 (Pullback Retest Support)",
+      badge: "0 s/d +3%",
+      icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />,
+    },
+    {
+      value: "short",
+      label: "🔴 Short Setup",
+      desc: "Harga 0% s/d -3% di bawah EMA 50 (Rejection Retest Resistance)",
+      badge: "0 s/d -3%",
+      icon: <TrendingDown className="w-3.5 h-3.5 text-rose-400" />,
+    },
+  ];
+
+  const timeframeOptions: DropdownOption<TimeframeFilterType>[] = [
+    {
+      value: "1h",
+      label: "1 Jam (1H)",
+      desc: "Timeframe 1 Jam untuk setup Day Trading & Scalping",
+      badge: "1H",
+      icon: <Clock className="w-3.5 h-3.5 text-cyan-400" />,
+    },
+    {
+      value: "4h",
+      label: "4 Jam (4H)",
+      desc: "Timeframe 4 Jam untuk setup Swing Trading yang lebih stabil",
+      badge: "4H",
+      icon: <Clock className="w-3.5 h-3.5 text-indigo-400" />,
+    },
+    {
+      value: "1d",
+      label: "1 Hari (1D)",
+      desc: "Timeframe Daily untuk tren makro utama",
+      badge: "1D",
+      icon: <Clock className="w-3.5 h-3.5 text-amber-400" />,
+    },
+  ];
+
+  const volumeOptions: DropdownOption<VolumeFilterType>[] = [
     {
       value: "all",
       label: "Semua Volume",
       desc: "Seluruh pair USDT tanpa batas minimum volume",
       badge: "Semua",
       icon: <Globe className="w-3.5 h-3.5 text-cyan-400" />,
+    },
+    {
+      value: "illiquid",
+      label: "Tidak Likuid",
+      desc: "Turnover 24h < $500K (Low Cap / Illiquid Gems)",
+      badge: "< $500K",
+      icon: <Flame className="w-3.5 h-3.5 text-amber-400" />,
     },
     {
       value: "medium",
@@ -96,20 +160,20 @@ export function FilterControls({
     {
       value: "default",
       label: "Default",
-      desc: "Prioritas 3 Timeframe lolos EMA & volume",
+      desc: "Prioritas sinyal aktif, confluence, lalu volume",
       icon: <Zap className="w-3.5 h-3.5 text-emerald-400" />,
     },
     {
-      value: "dist1h_desc",
-      label: "Jarak 1H",
-      desc: "% Selisih harga di atas EMA 21 1H tertinggi",
-      icon: <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />,
+      value: "ema50_asc",
+      label: "Terdekat EMA50",
+      desc: "Paling mendekati garis EMA 50 (jarak 0%)",
+      icon: <Target className="w-3.5 h-3.5 text-pink-400" />,
     },
     {
-      value: "dist1d_desc",
-      label: "Jarak 1D",
-      desc: "% Selisih harga di atas EMA 21 1D tertinggi",
-      icon: <ArrowUpRight className="w-3.5 h-3.5 text-indigo-400" />,
+      value: "rr_desc",
+      label: "Potensi TP2 (R:R)",
+      desc: "Persentase potensi keuntungan TP2 terbesar",
+      icon: <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />,
     },
     {
       value: "gain_desc",
@@ -118,16 +182,16 @@ export function FilterControls({
       icon: <Flame className="w-3.5 h-3.5 text-amber-400" />,
     },
     {
-      value: "vol_asc",
-      label: "Paling Illiquid",
-      desc: "Volume turnover paling kecil ke besar",
-      icon: <Droplet className="w-3.5 h-3.5 text-orange-400" />,
-    },
-    {
       value: "vol_desc",
       label: "Volume Terbesar",
       desc: "Volume turnover paling besar ke kecil",
       icon: <BarChart3 className="w-3.5 h-3.5 text-blue-400" />,
+    },
+    {
+      value: "vol_asc",
+      label: "Paling Illiquid",
+      desc: "Volume turnover paling kecil ke besar",
+      icon: <Droplet className="w-3.5 h-3.5 text-orange-400" />,
     },
   ];
 
@@ -162,11 +226,35 @@ export function FilterControls({
           )}
         </div>
 
-        {/* Row 2: Responsive Filter Controls & Dropdowns */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+        {/* Row 2: Filter Controls Grid */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
           {/* Controls Group */}
-          <div className="grid grid-cols-1 xs:grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3">
-            {/* Confluence Checkbox Toggle */}
+          <div className="grid grid-cols-2 xs:grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5">
+            {/* 1. Sinyal EMA 50 Filter (Long / Short / All) */}
+            <div className="w-full sm:w-auto">
+              <CustomDropdown
+                value={signalFilter}
+                options={signalOptions}
+                onChange={onSignalFilterChange}
+                prefixLabel="Sinyal"
+                icon={<Target className="w-3.5 h-3.5 text-emerald-400" />}
+                align="left"
+              />
+            </div>
+
+            {/* 2. Timeframe Acuan EMA 50 */}
+            <div className="w-full sm:w-auto">
+              <CustomDropdown
+                value={timeframeFilter}
+                options={timeframeOptions}
+                onChange={onTimeframeFilterChange}
+                prefixLabel="TF"
+                icon={<Clock className="w-3.5 h-3.5 text-cyan-400" />}
+                align="left"
+              />
+            </div>
+
+            {/* 3. Confluence Checkbox Toggle */}
             <label className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer select-none transition-all active:scale-[0.98]">
               <input
                 type="checkbox"
@@ -175,11 +263,11 @@ export function FilterControls({
                 className="w-4 h-4 rounded text-emerald-500 bg-gray-900 border-gray-700 focus:ring-0 cursor-pointer accent-emerald-500 shrink-0"
               />
               <span className="text-[11px] sm:text-xs font-semibold text-emerald-300 whitespace-nowrap">
-                1H • 4H • 1D &gt; EMA21
+                3TF &gt; EMA21
               </span>
             </label>
 
-            {/* Custom Web3 Volume Dropdown */}
+            {/* 4. Volume Dropdown */}
             <div className="w-full sm:w-auto">
               <CustomDropdown
                 value={volumeFilter}
@@ -191,7 +279,7 @@ export function FilterControls({
               />
             </div>
 
-            {/* Custom Web3 Sort Dropdown */}
+            {/* 5. Sort Dropdown */}
             <div className="w-full sm:w-auto">
               <CustomDropdown
                 value={sortBy}
@@ -205,7 +293,7 @@ export function FilterControls({
           </div>
 
           {/* Action Buttons: Mulai Scan & Stop Scan */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
             {isScanning && onStopScan && (
               <button
                 type="button"
@@ -244,3 +332,4 @@ export function FilterControls({
     </div>
   );
 }
+

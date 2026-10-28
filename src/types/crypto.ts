@@ -19,11 +19,30 @@ export interface KlineRaw {
   time: string; // timestamp ms
 }
 
+export type SetupSignal = "LONG" | "SHORT" | "NONE";
+
+export interface TradeSetup {
+  signal: SetupSignal;
+  entryPrice: number;
+  stopLoss: number;
+  tp1: number; // 1:1.5 Risk-Reward
+  tp2: number; // 1:2.5 Risk-Reward
+  riskPercent: number;
+  reward1Percent: number;
+  reward2Percent: number;
+  diffPercentEMA50: number;
+  ema50: number;
+  timeframe: "1h" | "4h" | "1d";
+}
+
 export interface TimeframeEMA {
   ema21: number;
   diffPercent: number; // ((price - ema) / ema) * 100
   isAbove: boolean;
   candlesCount: number;
+  ema50?: number;
+  diffPercentEMA50?: number;
+  setup?: TradeSetup | null;
 }
 
 export interface ScannedCoin {
@@ -37,6 +56,7 @@ export interface ScannedCoin {
   tf4h: TimeframeEMA;
   tf1d: TimeframeEMA;
   isConfluence: boolean; // all 3 timeframes > EMA 21
+  tradeSetup?: TradeSetup | null; // Primary setup (1H or best active setup)
   scannedAt: number;
 }
 
@@ -71,8 +91,11 @@ export interface ScanApiResponse {
     totalPairs: number;
     scannedCount: number;
     confluenceCount: number;
+    longCount: number;
+    shortCount: number;
     lastUpdated: number;
     isScanning: boolean;
     scanDurationMs: number;
   };
 }
+

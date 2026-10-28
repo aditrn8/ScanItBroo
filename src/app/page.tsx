@@ -7,10 +7,13 @@ import {
   FilterControls,
   VolumeFilterType,
   SortOptionType,
+  SignalFilterType,
+  TimeframeFilterType,
 } from "@/components/FilterControls";
 import { CoinCard } from "@/components/CoinCard";
 import { Pagination } from "@/components/Pagination";
 import { CoinDetailModal } from "@/components/CoinDetailModal";
+import { MusicPlayer } from "@/components/MusicPlayer";
 import { ScannedCoin, ScanApiResponse } from "@/types/crypto";
 import {
   Zap,
@@ -20,8 +23,10 @@ import {
   Flame,
   Globe,
   Rocket,
-  Radio,
   Square,
+  TrendingUp,
+  TrendingDown,
+  Target,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -30,6 +35,8 @@ export default function HomePage() {
     totalPairs: 0,
     scannedCount: 0,
     confluenceCount: 0,
+    longCount: 0,
+    shortCount: 0,
     lastUpdated: 0,
     isScanning: false,
     scanDurationMs: 0,
@@ -37,8 +44,10 @@ export default function HomePage() {
 
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [search, setSearch] = useState("");
-  const [confluenceOnly, setConfluenceOnly] = useState(true);
-  const [volumeFilter, setVolumeFilter] = useState<VolumeFilterType>("illiquid");
+  const [confluenceOnly, setConfluenceOnly] = useState(false);
+  const [signalFilter, setSignalFilter] = useState<SignalFilterType>("all");
+  const [timeframeFilter, setTimeframeFilter] = useState<TimeframeFilterType>("1h");
+  const [volumeFilter, setVolumeFilter] = useState<VolumeFilterType>("all");
   const [sortBy, setSortBy] = useState<SortOptionType>("default");
 
   // Pagination states
@@ -89,7 +98,6 @@ export default function HomePage() {
       setCurrentPage(1);
       await fetch("/api/scan", { method: "POST" });
       setSummary((prev) => ({ ...prev, isScanning: true, scannedCount: 0 }));
-      // Quick poll after trigger
       setTimeout(() => fetchScanData(), 600);
     } catch (err) {
       console.error("Failed to trigger scan:", err);
@@ -115,6 +123,16 @@ export default function HomePage() {
 
   const handleConfluenceChange = (val: boolean) => {
     setConfluenceOnly(val);
+    setCurrentPage(1);
+  };
+
+  const handleSignalFilterChange = (val: SignalFilterType) => {
+    setSignalFilter(val);
+    setCurrentPage(1);
+  };
+
+  const handleTimeframeFilterChange = (val: TimeframeFilterType) => {
+    setTimeframeFilter(val);
     setCurrentPage(1);
   };
 
@@ -146,7 +164,23 @@ export default function HomePage() {
           return false;
         }
 
-        // 3. Volume Liquidity Filter
+        // 3. Sinyal Setup Filter (EMA 50 0-3% Long / Short)
+        const targetTF =
+          timeframeFilter === "1h"
+            ? coin.tf1h
+            : timeframeFilter === "4h"
+            ? coin.tf4h
+            : coin.tf1d;
+        const activeSetup = targetTF?.setup || (timeframeFilter === "1h" ? coin.tradeSetup : null);
+
+        if (signalFilter === "long" && activeSetup?.signal !== "LONG") {
+          return false;
+        }
+        if (signalFilter === "short" && activeSetup?.signal !== "SHORT") {
+          return false;
+        }
+
+        // 4. Volume Liquidity Filter
         if (volumeFilter === "illiquid" && coin.volume24h >= 500000) {
           return false;
         }
@@ -163,6 +197,23 @@ export default function HomePage() {
         return true;
       })
       .sort((a, b) => {
+        const targetTFA =
+          timeframeFilter === "1h" ? a.tf1h : timeframeFilter === "4h" ? a.tf4h : a.tf1d;
+        const targetTFB =
+          timeframeFilter === "1h" ? b.tf1h : timeframeFilter === "4h" ? b.tf4h : b.tf1d;
+        const setupA = targetTFA?.setup || a.tradeSetup;
+        const setupB = targetTFB?.setup || b.tradeSetup;
+
+        if (sortBy === "rr_desc") {
+          const rewardA = setupA?.reward2Percent || 0;
+          const rewardB = setupB?.reward2Percent || 0;
+          return rewardB - rewardA;
+        }
+        if (sortBy === "ema50_asc") {
+          const distA = Math.abs(setupA?.diffPercentEMA50 ?? 999);
+          const distB = Math.abs(setupB?.diffPercentEMA50 ?? 999);
+          return distA - distB;
+        }
         if (sortBy === "dist1h_desc") {
           return b.tf1h.diffPercent - a.tf1h.diffPercent;
         }
@@ -178,12 +229,17 @@ export default function HomePage() {
         if (sortBy === "vol_desc") {
           return b.volume24h - a.volume24h;
         }
-        // Default: Confluence first, then volume
+
+        // Default Priority: Setup aktif dulu, lalu Confluence, lalu volume
+        const hasSetupA = Boolean(setupA);
+        const hasSetupB = Boolean(setupB);
+        if (hasSetupA && !hasSetupB) return -1;
+        if (!hasSetupA && hasSetupB) return 1;
         if (a.isConfluence && !b.isConfluence) return -1;
         if (!a.isConfluence && b.isConfluence) return 1;
         return b.volume24h - a.volume24h;
       });
-  }, [coins, search, confluenceOnly, volumeFilter, sortBy]);
+  }, [coins, search, confluenceOnly, signalFilter, timeframeFilter, volumeFilter, sortBy]);
 
   // Paginated Coins
   const paginatedCoins = useMemo(() => {
@@ -221,12 +277,16 @@ export default function HomePage() {
           <StatsBar coins={coins} totalScanned={summary.totalPairs || coins.length} />
         )}
 
-        {/* Filter Controls Bar with Custom Dropdowns */}
+        {/* Filter Controls Bar */}
         <FilterControls
           search={search}
           onSearchChange={handleSearchChange}
           confluenceOnly={confluenceOnly}
           onConfluenceOnlyChange={handleConfluenceChange}
+          signalFilter={signalFilter}
+          onSignalFilterChange={handleSignalFilterChange}
+          timeframeFilter={timeframeFilter}
+          onTimeframeFilterChange={handleTimeframeFilterChange}
           volumeFilter={volumeFilter}
           onVolumeFilterChange={handleVolumeFilterChange}
           sortBy={sortBy}
@@ -238,7 +298,7 @@ export default function HomePage() {
           hasScanned={hasEverScanned}
         />
 
-        {/* Live Scanning Banner (Shows when scanning is in progress) */}
+        {/* Live Scanning Banner */}
         {summary.isScanning && (
           <div className="glass-panel p-3.5 sm:p-4 rounded-2xl mb-4 border border-emerald-500/30 bg-emerald-500/5 flex flex-col sm:flex-row items-center justify-between gap-3 animate-pulse-subtle">
             <div className="flex items-center gap-2.5">
@@ -256,8 +316,8 @@ export default function HomePage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-400">
-                  Koin yang memenuhi kriteria langsung muncul di bawah secara bertahap
-                  tanpa menunggu selesai.
+                  Koin yang memenuhi kriteria EMA 50 &amp; EMA 21 langsung muncul di bawah secara bertahap
+                  lengkap dengan set TP &amp; SL.
                 </p>
               </div>
             </div>
@@ -284,85 +344,84 @@ export default function HomePage() {
             <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
 
             <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-[11px] sm:text-xs font-semibold mb-4 sm:mb-5">
-              <Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Bitunix Scanner Siap Digunakan</span>
+              <Target className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Bitunix EMA 50 Sweet Spot Screener + Auto TP/SL</span>
             </div>
 
             <h2 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-white max-w-2xl mb-3 sm:mb-4 leading-snug sm:leading-tight">
-              Pilih Filter Favorit Kamu, Lalu Tekan{" "}
-              <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+              Pilih Setup Favorit Kamu, Lalu Tekan{" "}
+              <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
                 Mulai Scan
               </span>
             </h2>
 
             <p className="text-xs sm:text-sm text-gray-400 max-w-xl mb-6 sm:mb-8 leading-relaxed">
-              Atur volume likuiditas & timeframe di atas. Saat tombol ditekan, koin yang
-              lolos kriteria akan <strong>langsung muncul live satu per satu</strong> di
-              layar secara bertahap.
+              Deteksi otomatis koin yang sedang berada di zona pullback <strong>0% s/d 3% dari EMA 50</strong>{" "}
+              lengkap dengan kalkulasi otomatis <strong>Entry, Stop Loss, TP1 (1.5R), dan TP2 (2.5R)</strong>.
             </p>
 
-            {/* Filter Preset Buttons */}
+            {/* Quick Strategy Presets */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full max-w-2xl mb-6 sm:mb-8">
               <button
                 type="button"
                 onClick={() => {
-                  handleVolumeFilterChange("illiquid");
-                  handleConfluenceChange(true);
+                  handleSignalFilterChange("long");
+                  handleConfluenceChange(false);
                 }}
                 className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer active:scale-[0.98] ${
-                  volumeFilter === "illiquid"
-                    ? "bg-amber-500/15 border-amber-500/40 text-white shadow-glow-cyan"
-                    : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Flame className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="text-xs font-bold">Preset 1: Illiquid Gems</span>
-                </div>
-                <p className="text-[11px] text-gray-400">
-                  Turnover &lt; $500K • Potensi pump tinggi
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleVolumeFilterChange("all");
-                  handleConfluenceChange(true);
-                }}
-                className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer active:scale-[0.98] ${
-                  volumeFilter === "all"
-                    ? "bg-cyan-500/15 border-cyan-500/40 text-white shadow-glow-cyan"
-                    : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span className="text-xs font-bold">Preset 2: Semua Volume</span>
-                </div>
-                <p className="text-[11px] text-gray-400">
-                  Scan seluruh pair USDT tanpa batasan
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleVolumeFilterChange("liquid");
-                  handleConfluenceChange(true);
-                }}
-                className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer active:scale-[0.98] ${
-                  volumeFilter === "liquid"
+                  signalFilter === "long"
                     ? "bg-emerald-500/15 border-emerald-500/40 text-white shadow-glow-green"
                     : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-300"
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Rocket className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="text-xs font-bold">Preset 3: Likuid Tinggi</span>
+                  <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-xs font-bold">🟢 Long Setup (0-3%)</span>
                 </div>
                 <p className="text-[11px] text-gray-400">
-                  Volume &gt; $5M untuk pair berkapitalisasi besar
+                  Harga 0 s/d +3% di atas EMA50 • Retest support
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleSignalFilterChange("short");
+                  handleConfluenceChange(false);
+                }}
+                className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer active:scale-[0.98] ${
+                  signalFilter === "short"
+                    ? "bg-rose-500/15 border-rose-500/40 text-white shadow-glow-red"
+                    : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-300"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingDown className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span className="text-xs font-bold">🔴 Short Setup (0-3%)</span>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  Harga 0 s/d -3% di bawah EMA50 • Retest resistance
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleSignalFilterChange("all");
+                  handleConfluenceChange(true);
+                }}
+                className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer active:scale-[0.98] ${
+                  confluenceOnly
+                    ? "bg-cyan-500/15 border-cyan-500/40 text-white shadow-glow-cyan"
+                    : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-300"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span className="text-xs font-bold">🛡️ 3TF Confluence</span>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  1H + 4H + 1D serempak di atas EMA 21
                 </p>
               </button>
             </div>
@@ -383,11 +442,11 @@ export default function HomePage() {
           <div className="glass-panel rounded-3xl p-8 sm:p-16 text-center flex flex-col items-center justify-center my-4 border border-white/10">
             <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-400 animate-spin mb-4" />
             <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
-              Memulai Pemindaian Real-Time...
+              Memindai Seluruh Futures Bitunix Secara Real-Time...
             </h3>
             <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-4">
-              Mengambil kline 1H, 4H, dan 1D dari Bitunix. Begitu ada koin yang cocok,
-              kartunya langsung muncul di sini.
+              Menghitung EMA 50 &amp; EMA 21 pada TF 1H, 4H, dan 1D. Setup TP &amp; SL langsung
+              dihitung secara otomatis begitu koin terdeteksi.
             </p>
             <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-emerald-300 font-mono">
               Terproses: {summary.scannedCount} / {summary.totalPairs || "..."} pairs
@@ -404,6 +463,7 @@ export default function HomePage() {
                 <CoinCard
                   key={coin.symbol}
                   coin={coin}
+                  activeTimeframe={timeframeFilter}
                   onSelect={(c) => setSelectedCoin(c)}
                 />
               ))}
@@ -436,13 +496,13 @@ export default function HomePage() {
               Tidak Ada Koin yang Memenuhi Kriteria Filter Saat Ini
             </h3>
             <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6">
-              Coba ubah filter volume likuiditas atau matikan centang &quot;1H • 4H •
-              1D &gt; EMA21&quot; untuk melihat koin lain.
+              Coba ganti filter sinyal ke &quot;Semua Setup&quot; atau ubah timeframe acuan EMA 50.
             </p>
             <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full sm:w-auto">
               <button
                 onClick={() => {
                   handleSearchChange("");
+                  handleSignalFilterChange("all");
                   handleVolumeFilterChange("all");
                   handleConfluenceChange(false);
                 }}
@@ -465,15 +525,18 @@ export default function HomePage() {
       <footer className="border-t border-white/5 py-4 sm:py-6 text-center text-[10px] sm:text-xs text-gray-500 px-4">
         <p>
           ScanItBroo &copy; 2026 &bull; Bitunix Public Data Scanner &bull; Multi-Timeframe
-          EMA 21 Confluence Engine
+          EMA 21 &amp; EMA 50 Retest Sniper Engine
         </p>
       </footer>
 
-      {/* Coin Detail Modal with TradingView Chart & Funding Rate */}
+      {/* Coin Detail Modal with Interactive TP/SL Calculator & TradingView Chart */}
       <CoinDetailModal
         coin={selectedCoin}
         onClose={() => setSelectedCoin(null)}
       />
+
+      {/* 🎵 Weird Genius Web3 Vibe Music Player Deck */}
+      <MusicPlayer />
     </div>
   );
 }

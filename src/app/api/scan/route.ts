@@ -22,6 +22,8 @@ export async function GET(request: Request) {
       totalPairs: cache.totalPairs,
       scannedCount: cache.scannedCount,
       confluenceCount: cache.confluenceCount,
+      longCount: cache.longCount || 0,
+      shortCount: cache.shortCount || 0,
       lastUpdated: cache.lastUpdated,
       isScanning: cache.isScanning,
       scanDurationMs: cache.scanDurationMs,

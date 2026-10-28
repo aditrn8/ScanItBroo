@@ -89,7 +89,7 @@ export async function getFuturesTickers(): Promise<BitunixTickerRaw[]> {
 export async function getFuturesKline(
   symbol: string,
   interval: "1h" | "4h" | "1d",
-  limit: number = 40
+  limit: number = 80
 ): Promise<KlineRaw[]> {
   const path = `/api/v1/futures/market/kline?symbol=${encodeURIComponent(
     symbol
